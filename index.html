@@ -1,0 +1,191 @@
+<html>
+<head>
+<link rel="stylesheet" href="css/default.css" type="text/css"/>
+<script src="//ajax.googleapis.com/ajax/libs/jquery/1.7.2/jquery.min.js" type="text/javascript"></script>
+<script src="js/jquery.Storage.js" type="text/javascript"></script>
+<script type="text/javascript" src="js/sha256.js"></script>
+<script type="text/javascript" src="js/wlist.js"></script>
+<script type="text/javascript" src="js/subst.js"></script>
+<script>
+    function capitalize(word) {
+        var first = word.substr(0,1).toUpperCase();
+        return first + word.substr(1);
+    }
+    function subst(word, key, map) {
+        word = word.split("");
+        key = (~~key) % (word.length*3);
+        while(key > 0) {
+            var p = key % word.length;
+            var sym = word[p].toLowerCase();
+            var sub = map[sym];
+            if (sub) word[p] = sub;
+            key -= word.length;
+        }
+        return word.join("");
+    }
+    function generate() {
+        var i;
+        var www = $("#site").val()
+        var pp = $("#phrase").val()
+        if (!(www && pp))
+            return;
+        var seq = parseInt($("#sequence").val()) || 1;
+        var sha = new jsSHA(www + seq, "ASCII");
+        var hmac = sha.getHMAC(pp, "ASCII", "SHA-256", "HEX");
+        var minlen = parseInt($("#minimum").val()) || 18;
+        var numbers = $("#numbers").is(":checked");
+        var symbols = $("#symbols").is(":checked");
+        var hval = [];
+        var hword = "";
+        var wll = wordlist.length;
+        for(i=0; i<hmac.length; i+=4) {
+            hval.push(parseInt(hmac.substr(i, 4), 16));
+        }
+        for(i=0; i<hval.length; i++) {
+            hword += capitalize(wordlist[hval[i] % wll]);
+            if (hword.length >= minlen)
+                break;
+        }
+        if (numbers)
+            hword = subst(hword, hval[hval.length-1]%256, numeric);
+        if (symbols)
+            hword = subst(hword, hval[hval.length-1]/256, symbolic);
+
+        $("#hashphrase").val(hword).select().focus();
+        $.Storage.set(www, JSON.stringify({
+            sequence: seq,
+            minimum: minlen,
+            numbers: numbers,
+            symbols: symbols
+        }));
+        return false;
+    }
+
+    function sequencenum() {
+        var seq = parseInt($("#sequence").val()) || 0;
+        $("#sequence").val(seq+1);
+        generate();
+        return false;
+    }
+
+    function setchk(cb, val) {
+        if (val) {
+            $(cb).attr('checked', true);
+        } else {
+            $(cb).attr('checked', false);
+        }
+    }
+    function sitechanged() {
+        var www = $("#site").val()
+        var options = $.Storage.get(www);
+        if (options) {
+            options = $.parseJSON(options);
+            if (options.minimum != undefined) $("#minimum").val(options.minimum);
+            if (options.sequence != undefined) $("#sequence").val(options.sequence);
+            setchk("#numbers", options.numbers);
+            setchk("#symbols", options.symbods);
+        }
+        return false;
+    }
+
+    $(document).ready(function() {
+        $("#seqbtn").click(sequencenum);
+        $("#submit").click(generate);
+        $("#numbers").click(function() { generate(); return true; });
+        $("#symbols").click(function() { generate(); return true; });
+        $("#site").change(sitechanged);
+        $("#showexp").toggle(function() { $("#explain").show(); },
+            function() { $("#explain").hide();
+        });
+    });
+</script>
+</head>
+<body>
+    <div id="header">
+        <h1>Hashphrase Generator</h1>
+    </div>
+    <div id="content">
+    <table>
+        <tbody>
+        <form id="main" action="" method="POST">
+            <tr>
+                <td>
+                    <table class="main">
+                        <tbody>
+                        <tr>
+                            <td>Website:</td>
+                            <td><input type="text" id="site" size="50"></td>
+                        </tr>
+                        <tr>
+                            <td>Passphrase:</td>
+                            <td><input type="password" id="phrase" width="40"></td>
+                        </tr>
+                        <tr>
+                            <td></td>
+                            <td><input type="submit" id="submit" value="Generate"></td>
+                        </tr>
+                        <tr>
+                            <td>Hashphrase:</td>
+                            <td><input type="text" id="hashphrase" size="50"></td>
+                        </tr>
+                        </tbody>
+                    </table>
+                </td>
+                <td>
+                    <table class="options">
+                        <thead>
+                            <th>Options</th>
+                        </thead>
+                        <tbody>
+                        <tr>
+                            <td>Min Length:</td>
+                            <td><input type="text" id="minimum" width="5" size="5" value="18"></td>
+                        </tr>
+                        <tr>
+                            <td><button id="seqbtn">Sequence</button></td>
+                            <td><input type="text" id="sequence" width="5" size="5" value="1"></td>
+                        </tr>
+                        <tr>
+                            <td colspan="2">
+                                <input type="checkbox" id="numbers">Numbers
+                            </td>
+                        </tr>
+                        <tr>
+                            <td colspan="2">
+                                <input type="checkbox" id="symbols">Symbols
+                            </td>
+                        </tr>
+                        </tbody>
+                    </table>
+                </td>
+            </tr>
+        </form>
+        </tbody>
+    </table>
+    </div>
+    <div id="footer">
+        <a href="#" id="showexp">How does this work?</a>
+        &nbsp;&nbsp;
+    </div>
+    <div id="explain">
+        <h3>What is a Hashphrase</h3>
+        A hashphrase is a pass phrase that is algorithmically generated using a secure hash algorithm.<p>
+
+        Secure hashes, also known as one-way functions, are a mathematical function, which given an
+        input will compute an output that cannot be reversed.  They are typically used in cryptography
+        to verify that a message has not been corrupted or tampered with.<p>
+
+        This hashphrase generator generates pass phrases by computing the secure hash of a website
+        address, the sequence number and a secret passphrase and using the result to create a
+        short English phrase that can be used as a password to that website.<p>
+
+        By using the hashphrase generator, you'll only have to remember one secure passphrase to
+        generate the passwords to any of the sites you visit.  The program that generates the
+        hashphrase runs completely within your browser.  No information is ever sent back to the
+        server.<p>
+    </div>
+</body>
+</html>
+<!--
+vim: ts=4 sts=4 sw=4 expandtab:
+-->
