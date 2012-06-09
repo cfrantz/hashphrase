@@ -7,6 +7,13 @@
 <script type="text/javascript" src="js/wlist.js"></script>
 <script type="text/javascript" src="js/subst.js"></script>
 <script>
+    function normalize(val) {
+        var normalized = val.match(/.*:\/\/.*?\//g);
+        if (normalized) {
+            return normalized;
+        }
+        return val;
+    }
     function capitalize(word) {
         var first = word.substr(0,1).toUpperCase();
         return first + word.substr(1);
@@ -25,7 +32,7 @@
     }
     function generate() {
         var i;
-        var www = $("#site").val()
+        var www = normalize($("#site").val());
         var pp = $("#phrase").val()
         if (!(www && pp))
             return;
@@ -76,7 +83,8 @@
         }
     }
     function sitechanged() {
-        var www = $("#site").val()
+        var www = normalize($("#site").val());
+        $("#site").val(www);
         var options = $.Storage.get(www);
         if (options) {
             options = $.parseJSON(options);
